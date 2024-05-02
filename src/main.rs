@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
+use axum::{extract::State, response::{Html, IntoResponse}, routing::get, Json, Router};
 use sysinfo::System;
 use tokio::sync::Mutex;
 #[tokio::main]
@@ -25,8 +25,10 @@ struct AppState {
     system: Mutex<System>
 }
 
-async fn root_get() -> &'static str {
-    "Hello there"
+#[axum::debug_handler]
+async fn root_get() -> impl IntoResponse {
+    let markup = tokio::fs::read_to_string("src/index.html").await.unwrap();
+    Html(markup)
 }
 
 #[axum::debug_handler]
