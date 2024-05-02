@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{extract::State, response::{Html, IntoResponse}, routing::get, Json, Router};
+use axum::{extract::State, http::Response, response::{Html, IntoResponse}, routing::get, Json, Router};
 use sysinfo::System;
 use tokio::sync::Mutex;
 #[tokio::main]
@@ -9,7 +9,8 @@ async fn main() {
 
 
     let app = Router::new()
-        .route("/", get(root_get))
+        .route("/", get(index_html_get))
+        .route("/index.mjs", get(index_mjs_get))
         .route("/api/cpus", get(cpus_get))
         .with_state(shared_state);
 
@@ -26,9 +27,20 @@ struct AppState {
 }
 
 #[axum::debug_handler]
-async fn root_get() -> impl IntoResponse {
-    let markup = tokio::fs::read_to_string("src/index.html").await.unwrap();
+async fn index_html_get() -> impl IntoResponse {
+    let markup = tokio::fs::read_to_string("web/index.html").await.unwrap();
+
     Html(markup)
+}
+
+#[axum::debug_handler]
+async fn index_mjs_get() -> impl IntoResponse {
+    let markup = tokio::fs::read_to_string("web/index.mjs").await.unwrap();
+
+    Response::builder()
+        .header("content-type", "application/javascript;charset=utf-8")
+        .body(markup)
+        .unwrap()
 }
 
 #[axum::debug_handler]
