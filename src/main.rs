@@ -75,9 +75,10 @@ async fn index_mjs_get() -> impl IntoResponse {
 #[axum::debug_handler]
 async fn cpus_get(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mut sys = state.system.lock().await;
-    sys.refresh_all();
+    sys.refresh_cpu();
+    sys.refresh_memory();
     
     let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
 
-    Json((System::name(), sys.total_memory(), sys.used_memory(), sys.cpus().len(), v))
+    Json((System::name(), sys.total_memory(), sys.used_memory(), sys.cpus().len(), v, System::host_name()))
 }
