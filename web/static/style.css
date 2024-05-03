@@ -1,0 +1,30 @@
+h1 {
+    color: greenyellow;
+}
+
+.inner {
+    position: absolute;
+}
+
+.cpu {
+    justify-content: center;
+}
+
+.cpu-fullbar, .cpu-percentage, .cpu-border {
+    height: 50px;
+}
+
+.cpu-fullbar {
+    background-color: darkgrey;
+}
+
+.cpu-border {
+    background-color: transparent;
+    border: solid;
+    border-width: 1px;
+    border: black solid;
+}
+
+.cpu-percentage {
+    background-color: lightgreen;
+}
