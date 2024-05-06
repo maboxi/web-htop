@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use axum::{extract::{Path, State}, http::{header, HeaderValue, Response, StatusCode}, response::{Html, IntoResponse}, routing::get, Json, Router};
+use axum::{extract::{Path, State}, http::{header::{self, CONTENT_TYPE}, HeaderValue, Method, Response, StatusCode}, response::{Html, IntoResponse}, routing::get, Json, Router};
 use sysinfo::System;
+use tower_http::cors::{Any, CorsLayer};
 use tokio::sync::Mutex;
 
 
@@ -15,7 +16,13 @@ async fn main() {
         .route("/index.mjs", get(index_mjs_get))
         .route("/api/cpus", get(cpus_get))
         .route("/static/*path", get(static_get))   
-        .with_state(shared_state);
+        .with_state(shared_state)
+        .layer(CorsLayer::new()
+            .allow_origin(Any)
+            .allow_private_network(true)
+            .allow_methods([Method::GET, Method::POST])
+            .allow_headers([CONTENT_TYPE])
+        );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:7032").await.unwrap();
 
