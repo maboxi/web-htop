@@ -10,23 +10,25 @@ export function HTOP() {
     let ref_cpu = useRef(null);
     useEffect(() => {
         setInterval(async () => {
-            let response = await fetch(API);
-            if(response.status !== 200) {
-                throw new Error('HTTP error! status: ${response.status}');
+            if(!(ref_cpu.current == null)) {
+                let response = await fetch(API);
+                if(response.status !== 200) {
+                    throw new Error('HTTP error! status: ${response.status}');
+                }
+                let json = await response.json();
+                let heading = <h1>System name: {json[0]}</h1>;
+                let hostname = <h2>Hostname: {json[5]}</h2>;
+                let ramusage = <p>RAM Usage: {(json[2] / (1024**3)).toFixed(1)}GB ({Math.floor(100 * json[2]/json[1])}% of {(json[1]/(1024**3)).toFixed()}GB)</p>;
+                let cpuinfo = getCPUInfo(json[4]);
+            
+                render(
+                    <>
+                        {heading}
+                        {hostname}
+                        {ramusage}
+                        {cpuinfo}
+                    </>, ref_cpu.current);
             }
-            let json = await response.json();
-            let heading = <h1>System name: {json[0]}</h1>;
-            let hostname = <h2>Hostname: {json[5]}</h2>;
-            let ramusage = <p>RAM Usage: {(json[2] / (1024**3)).toFixed(1)}GB ({Math.floor(100 * json[2]/json[1])}% of {(json[1]/(1024**3)).toFixed()}GB)</p>;
-            let cpuinfo = getCPUInfo(json[4]);
-
-            render(
-                <>
-                    {heading}
-                    {hostname}
-                    {ramusage}
-                    {cpuinfo}
-                </>, ref_cpu.current);
         }, 100);
     });
     return (<div class="cpu-outer" ref={ref_cpu}></div>);
