@@ -1,0 +1,50 @@
+h1 {
+    color: greenyellow;
+    text-align: center;
+}
+
+.outer {
+    width: max-content;
+    height: max-content;
+    margin: auto;
+    justify-content: center;
+}
+
+.inner {
+    position: absolute;
+}
+
+.cpu {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    height: 50px;
+    justify-content: center;
+}
+
+.cpu-text {
+    z-index: 10;
+    text-align: justify;
+    margin-left: 30px;
+}
+
+.cpu-fullbar, .cpu-percentage, .cpu-border {
+    height: 50px;
+}
+
+.cpu-fullbar {
+    background-color: darkgrey;
+    margin-top: 2px;
+    margin-left: 2px;
+}
+
+.cpu-border {
+    background-color: transparent;
+    border: solid;
+    border-width: 2px;
+}
+
+.cpu-percentage {
+    background-color: lightgreen;
+    margin-top: 2px;
+    margin-left: 2px;
+}

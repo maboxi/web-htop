@@ -9,6 +9,9 @@ export function Header() {
 				<a href="/" class={url == '/' && 'active'}>
 					Home
 				</a>
+				<a href="/htop" class={url == '/htop' && 'active'}>
+					Web-HTOP
+				</a>
 				<a href="/404" class={url == '/404' && 'active'}>
 					404
 				</a>
