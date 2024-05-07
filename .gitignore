@@ -1,4 +1,6 @@
 /target
+Cargo.lock
+htop-preact/package-lock.json
 
 # Logs
 logs
