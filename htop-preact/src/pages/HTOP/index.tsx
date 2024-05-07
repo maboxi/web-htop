@@ -5,6 +5,7 @@ import './style.css';
 const API = 'http://127.0.0.1:7032/api/cpus';
 
 const cpudivwidth = 300;
+const cpuspercolumn = 4;
 
 export function HTOP() {
     let ref_cpu = useRef(null);
@@ -36,14 +37,24 @@ export function HTOP() {
 }
 
 function getCPUInfo(cpuinfo: number[]) {
-    return (<div>{cpuinfo.map((cpu, i) => 
-        <div class="cpu">
-        <div class="cpu-border inner" style={"width: " + cpudivwidth + "px"}>
-            <p class="cpu-text inner">CPU{(i+1).toString().padStart(2, ' ')}: {cpu.toFixed(1).toString().padStart(6, ' ')}</p>
-        </div>
-        <div class="cpu-fullbar inner" style={"width: " + cpudivwidth + "px"}></div>
-        <div class="cpu-percentage inner" style={"width: " + (cpu / 100 * cpudivwidth) + "px"}></div>
-        </div>
-    )}
-    </div>);
+    let table_data = [];
+    let divwidth = "width: " + cpudivwidth + "px";
+    for (let row = 0; row < cpuspercolumn; row++) {
+        let row_data = [];
+        for (let col = 0; col < (cpuinfo.length / cpuspercolumn); col++) {
+            let i = col * cpuspercolumn + row;
+            let cpu = cpuinfo[i];
+            row_data.push(
+                <td class="cpu" style={"width:"+cpudivwidth+"px"}>
+                    <div class="cpu-border inner" style={divwidth}>
+                        <p class="cpu-text inner">CPU{(i+1).toString().padStart(2, ' ')}: {cpu.toFixed(1).toString().padStart(6, ' ')}</p>
+                    </div>
+                    <div class="cpu-fullbar inner" style={divwidth}/>
+                    <div class="cpu-percentage inner" style={"width: " + (cpu / 100 * cpudivwidth) + "px"} />
+                </td>);
+        }
+        table_data.push(<tr>{row_data}</tr>);
+    }
+
+    return(<table>{table_data}</table>)
 }
