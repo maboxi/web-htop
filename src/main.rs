@@ -1,27 +1,48 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use axum::{extract::State, http::{header::CONTENT_TYPE, Method}, response::IntoResponse, routing::{get, post}, Json, Router};
+use axum::{extract::{ws::{Message, WebSocket}, State, WebSocketUpgrade}, http::{header::CONTENT_TYPE, Method}, response::{IntoResponse, Response}, routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
 use sysinfo::System;
 use tower_http::cors::{Any, CorsLayer};
-use tokio::sync::Mutex;
 
 
 #[tokio::main]
 async fn main() {
-    let shared_state = Arc::new(AppState {system: Mutex::new(System::new()), reqcounter: Mutex::new(0)});
-
+    let shared_state = Arc::new(AppState {system_state: Arc::new(Mutex::new(SystemState::default())), reqcounter: Mutex::new(0)});
 
     let app = Router::new()
         .route("/api/cpus", get(cpus_get))
+        .route("/api/cpus/ws", get(cpus_ws_handler))
         .route("/api/algorithms", post(algorithms_post))
-        .with_state(shared_state)
+        .route("/api/algorithms/ws/console", get(algorithms_ws_handler))
+        .with_state(shared_state.clone())
         .layer(CorsLayer::new()
             .allow_origin(Any)
             .allow_private_network(true)
             .allow_methods([Method::GET, Method::POST])
             .allow_headers([CONTENT_TYPE])
         );
+
+    tokio::task::spawn_blocking(move || {
+        let mut sys = System::new();
+        loop {
+            sys.refresh_all();
+            let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
+
+            {
+                let mut system_state = shared_state.system_state.lock().unwrap();
+                system_state.cpus = sys.cpus().len();
+                system_state.cpu_usage = v;
+                system_state.total_memory = sys.total_memory();
+                system_state.used_memory = sys.used_memory();
+                system_state.system_name = System::name().unwrap_or("Unknown".to_string());
+                system_state.host_name = System::host_name().unwrap_or("Unknown".to_string());
+                system_state.was_updated = true;
+            }
+            std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+        }
+    });
+
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:7032").await.unwrap();
 
@@ -31,21 +52,41 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+
+#[derive(Debug, Serialize, Default, Clone)]
+struct SystemState {
+    system_name: String,
+    total_memory: u64,
+    used_memory: u64,
+    cpus: usize,
+    cpu_usage: Vec<f32>,
+    host_name: String,
+    was_updated: bool,
+}
+
 struct AppState {
-    system: Mutex<System>,
+    system_state: Arc<Mutex<SystemState>>,
     reqcounter: Mutex<usize>
 }
 
+
 #[axum::debug_handler]
 async fn cpus_get(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let mut sys = state.system.lock().await;
-    sys.refresh_cpu();
-    sys.refresh_memory();
-    
-    let v: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
-
-    Json((System::name(), sys.total_memory(), sys.used_memory(), sys.cpus().len(), v, System::host_name()))
+    serde_json::to_string(&(*state.system_state.lock().unwrap())).unwrap_or("{'error': 'system state json conversion failed!'}".to_string())
 }
+
+async fn cpus_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
+    socket.on_upgrade(|ws| async { cpus_handle_socket(ws, state).await })
+}
+
+async fn cpus_handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
+    loop {
+        let payload = serde_json::to_string(&(*state.system_state.lock().unwrap())).unwrap_or("{'error': 'system state json conversion failed!'}".to_string());
+        socket.send(Message::Text(payload)).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+}
+
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct AlgorithmRequest {
@@ -85,7 +126,7 @@ enum AlgorithmExecutionResponse {
 async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: String) -> impl IntoResponse {
     let counter: usize;
     {
-        let mut state_counter = state.reqcounter.lock().await;
+        let mut state_counter = state.reqcounter.lock().unwrap();
         *state_counter += 1;
         counter = *state_counter;
     }
@@ -132,4 +173,15 @@ async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: Strin
     };
 
     response
+}
+
+async fn algorithms_ws_handler(socket: WebSocketUpgrade) -> impl IntoResponse {
+    socket.on_upgrade(|ws| algorithms_handle_socket(ws))
+}
+
+async fn algorithms_handle_socket(mut socket: WebSocket) {
+    if socket.send(Message::Text("Hello from the server!".to_string())).await.is_err() {
+        println!("Socket closed!");
+        return;
+    }
 }

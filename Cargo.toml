@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version="0.7.5", features = ["macros"] }
+axum = { version="0.7.5", features = ["macros", "ws"] }
 mime_guess = "2.0.4"
 nix = { version="0.28.0", features = ["user"] }
 serde = { version="1.0.200", features = ["derive"] }

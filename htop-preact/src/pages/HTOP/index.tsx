@@ -17,10 +17,10 @@ export function HTOP() {
                     throw new Error('HTTP error! status: ${response.status}');
                 }
                 let json = await response.json();
-                let heading = <h1>System name: {json[0]}</h1>;
-                let hostname = <h2>Hostname: {json[5]}</h2>;
-                let ramusage = <p>RAM Usage: {(json[2] / (1024**3)).toFixed(1)}GB ({Math.floor(100 * json[2]/json[1])}% of {(json[1]/(1024**3)).toFixed()}GB)</p>;
-                let cpuinfo = getCPUInfo(json[4]);
+                let heading = <h1 id="systemname">System name: {json['system_name']}</h1>;
+                let hostname = <h2 id="hostname">Hostname: {json['host_name']}</h2>;
+                let ramusage = <p id="ramusage">RAM Usage: {(json['used_memory'] / (1024**3)).toFixed(1)}GB ({Math.floor(100 * json['used_memory']/json['total_memory'])}% of {(json['total_memory']/(1024**3)).toFixed()}GB)</p>;
+                let cpuinfo = getCPUInfo(json['cpu_usage']);
             
                 render(
                     <>
@@ -45,7 +45,7 @@ function getCPUInfo(cpuinfo: number[]) {
             let i = col * cpuspercolumn + row;
             let cpu = cpuinfo[i];
             row_data.push(
-                <td class="cpu" style={"width:"+cpudivwidth+"px"}>
+                <td class="cpu" id={"cpu-" + i} style={"width:"+cpudivwidth+"px"}>
                     <div class="cpu-border inner" style={divwidth}>
                         <p class="cpu-text inner">CPU{(i+1).toString().padStart(2, ' ')}: {cpu.toFixed(1).toString().padStart(6, ' ')}</p>
                     </div>
@@ -53,8 +53,8 @@ function getCPUInfo(cpuinfo: number[]) {
                     <div class="cpu-percentage inner" style={"width: " + (cpu / 100 * cpudivwidth) + "px"} />
                 </td>);
         }
-        table_data.push(<tr>{row_data}</tr>);
+        table_data.push(<tr id={"cpu-row-" + row}>{row_data}</tr>);
     }
 
-    return(<table>{table_data}</table>)
+    return(<table id="cpu-table">{table_data}</table>)
 }
