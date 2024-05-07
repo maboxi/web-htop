@@ -47,22 +47,89 @@ async fn cpus_get(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json((System::name(), sys.total_memory(), sys.used_memory(), sys.cpus().len(), v, System::host_name()))
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct AlgorithmRequest {
-    algorithm: String
+    request_type: AlgorithmRequestType,
+    list_type: Option<AlgorithmListType>,
+    execution_data: Option<AlgorithmExecutionRequest>
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum AlgorithmRequestType {
+    List,
+    Execution
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum AlgorithmListType {
+    All,
+    Graph
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct AlgorithmExecutionRequest {
+    algorithm: String,
+    data: String
+}
+
+
+#[derive(Debug, Serialize)]
+enum AlgorithmExecutionResponse {
+    Ok,
+    Error
 }
 
 #[axum::debug_handler]
-async fn algorithms_post(State(state): State<Arc<AppState>>, Json(req): Json<AlgorithmRequest>) -> impl IntoResponse {
+async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: String) -> impl IntoResponse {
     let counter: usize;
     {
         let mut state_counter = state.reqcounter.lock().await;
         *state_counter += 1;
         counter = *state_counter;
     }
-    let response = Json(("ok", counter, req.clone().algorithm));
 
-    println!("Received request #{counter}: {:?}\n\t{:?}", &req, &response);
+    let request: AlgorithmRequest;
+
+    match serde_json::from_str::<AlgorithmRequest>(&request_body) {
+        Ok(req) => {
+            request = req;
+        },
+        Err(e) => {
+            let errmsg = format!("Error parsing request: {:?}", e);
+            println!("{}", errmsg);
+            return Json((AlgorithmExecutionResponse::Error, counter, errmsg));
+        }
+    }
+
+    println!("Received request #{counter}: {:?}", &request);
+
+    let response = match request.request_type {
+        AlgorithmRequestType::List => {
+            match request.list_type {
+                Some(AlgorithmListType::All) => {
+                    Json((AlgorithmExecutionResponse::Ok, counter, "['Rucksack-PTAS', 'Rucksack-FPTAS', 'Dijkstra', 'Johnson', 'Prim']".to_string()))
+                },
+                Some(AlgorithmListType::Graph) => {
+                    Json((AlgorithmExecutionResponse::Ok, counter, "Graph algorithms".to_string()))
+                },
+                None => {
+                    Json((AlgorithmExecutionResponse::Error, counter, "No list type specified".to_string()))
+                }
+            }
+        },
+        AlgorithmRequestType::Execution => {
+            match request.execution_data {
+                Some(data) => {
+                    Json((AlgorithmExecutionResponse::Ok, counter, format!("{:?}",data)))
+                },
+                None => {
+                    Json((AlgorithmExecutionResponse::Error, counter, "No execution data specified".to_string()))
+                }
+            }
+        }
+    };
 
     response
 }

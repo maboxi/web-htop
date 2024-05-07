@@ -830,6 +830,7 @@ dependencies = [
  "mime_guess",
  "nix",
  "serde",
+ "serde_json",
  "sysinfo",
  "tokio",
  "tower",

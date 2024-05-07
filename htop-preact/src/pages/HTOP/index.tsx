@@ -27,11 +27,12 @@ export function HTOP() {
                         {hostname}
                         {ramusage}
                         {cpuinfo}
-                    </>, ref_cpu.current);
+                    </>,
+                    ref_cpu.current);
             }
         }, 100);
     });
-    return (<div class="cpu-outer" ref={ref_cpu}></div>);
+    return (<div class="htop" ref={ref_cpu}></div>);
 }
 
 function getCPUInfo(cpuinfo: number[]) {
