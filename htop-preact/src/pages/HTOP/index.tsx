@@ -2,37 +2,44 @@ import { render } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import './style.css';
 
-const API = 'http://127.0.0.1:7032/api/cpus';
+const API = '127.0.0.1:7032/api/cpus';
 
 const cpudivwidth = 300;
 const cpuspercolumn = 4;
 
 export function HTOP() {
     let ref_cpu = useRef(null);
-    useEffect(() => {
-        setInterval(async () => {
-            if(!(ref_cpu.current == null)) {
-                let response = await fetch(API);
-                if(response.status !== 200) {
-                    throw new Error('HTTP error! status: ${response.status}');
-                }
-                let json = await response.json();
-                let heading = <h1 id="systemname">System name: {json['system_name']}</h1>;
-                let hostname = <h2 id="hostname">Hostname: {json['host_name']}</h2>;
-                let ramusage = <p id="ramusage">RAM Usage: {(json['used_memory'] / (1024**3)).toFixed(1)}GB ({Math.floor(100 * json['used_memory']/json['total_memory'])}% of {(json['total_memory']/(1024**3)).toFixed()}GB)</p>;
-                let cpuinfo = getCPUInfo(json['cpu_usage']);
-            
-                render(
-                    <>
-                        {heading}
-                        {hostname}
-                        {ramusage}
-                        {cpuinfo}
-                    </>,
-                    ref_cpu.current);
-            }
-        }, 100);
+    console.log("[HTOP] Connecting WebSocket to " + API + "/ws");
+    const socket = new WebSocket('ws://' + API + '/ws');
+    socket.addEventListener('message', (event) => {
+        if(!(ref_cpu.current == null)) {
+            let json = JSON.parse(event.data);
+            let heading = <h1 id="systemname">System name: {json['system_name']}</h1>;
+            let hostname = <h2 id="hostname">Hostname: {json['host_name']}</h2>;
+            let ramusage = <p id="ramusage">RAM Usage: {(json['used_memory'] / (1024**3)).toFixed(1)}GB ({Math.floor(100 * json['used_memory']/json['total_memory'])}% of {(json['total_memory']/(1024**3)).toFixed()}GB)</p>;
+            let cpuinfo = getCPUInfo(json['cpu_usage']);
+        
+            render(
+                <>
+                    {heading}
+                    {hostname}
+                    {ramusage}
+                    {cpuinfo}
+                </>,
+                ref_cpu.current);
+        } else {
+            console.log("[HTOP] Closing websocket...");
+            socket.close();
+        }
     });
+
+    window.addEventListener("unload", function () {
+    if(socket.readyState == WebSocket.OPEN) {
+        console.log("[HTOP] Closing websocket from window unload event...");
+        socket.close();
+    }
+    });
+
     return (<div class="htop" ref={ref_cpu}></div>);
 }
 
