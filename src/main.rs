@@ -1,8 +1,10 @@
+pub mod algorithms;
+
 use std::sync::{Arc, Mutex};
 
-use axum::{extract::{ws::{Message, WebSocket}, State, WebSocketUpgrade}, http::{header::CONTENT_TYPE, Method}, response::{IntoResponse, Response}, routing::{get, post}, Json, Router};
+use axum::{extract::{ws::{Message, WebSocket}, State, WebSocketUpgrade}, http::{header::CONTENT_TYPE, Method}, response::{IntoResponse, Response}, routing::{get, post}, Router};
 use futures_util::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sysinfo::System;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -138,123 +140,14 @@ async fn cpus_handle_socket(socket: WebSocket, state: Arc<AppState>, wsnum: usiz
 }
 
 
-/*
-    request = {
-        "request_type": "list" | "execute",
-        "content": {
-            <request-specific content>
-        }
-    }
-*/
-#[derive(Deserialize)]
-struct AlgorithmRequest {
-    request_type: AlgorithmRequestType,
-    content: serde_json::Value
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum AlgorithmRequestType {
-    List,
-    Execution
-}
-
-#[derive(Deserialize)]
-struct AlgorithmListRequest {
-    list_type: AlgorithmListType,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum AlgorithmListType {
-    All,
-    Graph
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct AlgorithmExecutionRequest {
-    algorithm: String,
-    data: String
-}
-
-#[derive(Debug, Serialize)]
-enum AlgorithmExecutionResponse {
-    Ok,
-    Error
-}
-
-
 #[axum::debug_handler]
 async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: String) -> impl IntoResponse {
-    let counter: usize;
     {
         let mut state_counter = state.reqcounter.lock().unwrap();
         *state_counter += 1;
-        counter = *state_counter;
     }
 
-
-
-    let request = match serde_json::from_str::<AlgorithmRequest>(&request_body) {
-        Ok(data_tl) => {
-            data_tl
-        },
-        Err(e) => {
-            let errmsg = format!("Error parsing toplevel request: {:?}", e);
-            println!("{}", errmsg);
-            return Json((AlgorithmExecutionResponse::Error, counter, errmsg));
-        }
-    };
-
-    //println!("Received request #{counter}: {:?}", &request);
-
-    match request.request_type {
-        AlgorithmRequestType::List => {
-            let request = match serde_json::from_value::<AlgorithmListRequest>(request.content) {
-                Ok(content_list) => {
-                    content_list
-                },
-                Err(e) => {
-                    let errmsg = format!("Error parsing toplevel request: {:?}", e);
-                    println!("{}", errmsg);
-                    return Json((AlgorithmExecutionResponse::Error, counter, errmsg));
-                }
-            };
-
-            handle_algorithm_list_request(request);
-        },
-        AlgorithmRequestType::Execution => {
-
-        }
-    }
-
-    let response = match request.request_type {
-        AlgorithmRequestType::List => {
-            match request.list_type {
-                Some(AlgorithmListType::All) => {
-                    Json((AlgorithmExecutionResponse::Ok, counter, "['Rucksack-PTAS', 'Rucksack-FPTAS', 'Dijkstra', 'Johnson', 'Prim']".to_string()))
-                },
-                Some(AlgorithmListType::Graph) => {
-                    Json((AlgorithmExecutionResponse::Ok, counter, "Graph algorithms".to_string()))
-                },
-                None => {
-                    Json((AlgorithmExecutionResponse::Error, counter, "No list type specified".to_string()))
-                }
-            }
-        },
-        AlgorithmRequestType::Execution => {
-            match request.execution_data {
-                Some(data) => {
-                    Json((AlgorithmExecutionResponse::Ok, counter, format!("{:?}",data)))
-                },
-                None => {
-                    Json((AlgorithmExecutionResponse::Error, counter, "No execution data specified".to_string()))
-                }
-            }
-        }
-    };
-
-    response
+    algorithms::handle_algorithm_request(request_body).await
 }
 
 async fn algorithms_console_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
