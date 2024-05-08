@@ -4,13 +4,15 @@ import { signal } from "@preact/signals";
 import './style.css';
 
 const API = '127.0.0.1:7032/api/algorithms';
-const signal_scrollbox = signal(0);
+const signal_scrollbox = signal("");
 
 export function Algorithms() {
     let ref_testtext = useRef(null);
     let ref_scrollbox = useRef(null);
     
     useEffect(() => {
+        signal_scrollbox.value = "";
+
         setInterval(async () => {
             if (!(ref_testtext.current == null)) {
                 let test = await fetch('http://' + API, {
@@ -25,17 +27,13 @@ export function Algorithms() {
                 render(<>{"Response: " + response}</>, ref_testtext.current);
             }
         }, 5000);
-    });
 
-    useEffect(() => {
         console.log("[ALGS] Connecting WebSocket to " + API + "/ws");
         const socket = new WebSocket('ws://' + API + '/ws/console');
         socket.addEventListener('message', (event) => {
             if(!(ref_testtext.current == null)) {
                 signal_scrollbox.value = signal_scrollbox.value + event.data;
-                render(<>{signal_scrollbox.value}</>, ref_scrollbox.current);
-                ref_scrollbox.current.scrollTop = ref_testtext.current.scrollHeight;
-            } else {
+           } else {
                 console.log("[ALGS] Closing websocket...");
                 socket.close();
             }
@@ -48,13 +46,14 @@ export function Algorithms() {
             socket.close();
         }
         });
-    });
+ 
+    }, []);
 
     return (
         <div id="algorithms-outer">
             <h1>Algorithms</h1>
             <p id="algorithms-testoutput" ref={ref_testtext} />
-            <div class="scrollbar" ref={ref_scrollbox} style="height:500px;width:500px;overflow:auto;white-space: pre-line;" />
+            <div class="scrollbox" ref={ref_scrollbox} style="">{signal_scrollbox.value}</div>
         </div>
     );
 }

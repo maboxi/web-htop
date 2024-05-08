@@ -1,0 +1,8 @@
+.scrollbox {
+    overflow:auto;
+    white-space: pre-line;
+    display: flex;
+    flex-direction: column-reverse;
+    height:500px;
+    width:500px;
+}
