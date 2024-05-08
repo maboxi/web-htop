@@ -22,7 +22,7 @@ async fn main() {
         .route("/api/cpus", get(cpus_get))
         .route("/api/cpus/ws", get(cpus_ws_handler))
         .route("/api/algorithms", post(algorithms_post))
-        .route("/api/algorithms/ws/console", get(algorithms_ws_handler))
+        .route("/api/algorithms/ws/console", get(algorithms_console_ws_handler))
         .with_state(shared_state.clone())
         .layer(CorsLayer::new()
             .allow_origin(Any)
@@ -137,11 +137,19 @@ async fn cpus_handle_socket(socket: WebSocket, state: Arc<AppState>, wsnum: usiz
     });
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+
+/*
+    request = {
+        "request_type": "list" | "execute",
+        "content": {
+            <request-specific content>
+        }
+    }
+*/
+#[derive(Deserialize)]
 struct AlgorithmRequest {
     request_type: AlgorithmRequestType,
-    list_type: Option<AlgorithmListType>,
-    execution_data: Option<AlgorithmExecutionRequest>
+    content: serde_json::Value
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -149,6 +157,11 @@ struct AlgorithmRequest {
 enum AlgorithmRequestType {
     List,
     Execution
+}
+
+#[derive(Deserialize)]
+struct AlgorithmListRequest {
+    list_type: AlgorithmListType,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -164,12 +177,12 @@ struct AlgorithmExecutionRequest {
     data: String
 }
 
-
 #[derive(Debug, Serialize)]
 enum AlgorithmExecutionResponse {
     Ok,
     Error
 }
+
 
 #[axum::debug_handler]
 async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: String) -> impl IntoResponse {
@@ -180,20 +193,40 @@ async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: Strin
         counter = *state_counter;
     }
 
-    let request: AlgorithmRequest;
 
-    match serde_json::from_str::<AlgorithmRequest>(&request_body) {
-        Ok(req) => {
-            request = req;
+
+    let request = match serde_json::from_str::<AlgorithmRequest>(&request_body) {
+        Ok(data_tl) => {
+            data_tl
         },
         Err(e) => {
-            let errmsg = format!("Error parsing request: {:?}", e);
+            let errmsg = format!("Error parsing toplevel request: {:?}", e);
             println!("{}", errmsg);
             return Json((AlgorithmExecutionResponse::Error, counter, errmsg));
         }
-    }
+    };
 
-    println!("Received request #{counter}: {:?}", &request);
+    //println!("Received request #{counter}: {:?}", &request);
+
+    match request.request_type {
+        AlgorithmRequestType::List => {
+            let request = match serde_json::from_value::<AlgorithmListRequest>(request.content) {
+                Ok(content_list) => {
+                    content_list
+                },
+                Err(e) => {
+                    let errmsg = format!("Error parsing toplevel request: {:?}", e);
+                    println!("{}", errmsg);
+                    return Json((AlgorithmExecutionResponse::Error, counter, errmsg));
+                }
+            };
+
+            handle_algorithm_list_request(request);
+        },
+        AlgorithmRequestType::Execution => {
+
+        }
+    }
 
     let response = match request.request_type {
         AlgorithmRequestType::List => {
@@ -224,7 +257,7 @@ async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: Strin
     response
 }
 
-async fn algorithms_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+async fn algorithms_console_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let counter: usize;
     {
         let mut state_counter = state.wscounter_algs.lock().unwrap();
@@ -232,16 +265,16 @@ async fn algorithms_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc
         counter = *state_counter;
     }
 
-    socket.on_upgrade(move |ws| async move { algorithms_handle_socket(ws, counter).await })
+    socket.on_upgrade(move |ws| async move { algorithms_console_handle_socket(ws, counter).await })
 }
 
-async fn algorithms_handle_socket(socket: WebSocket, wsnum: usize) {
+async fn algorithms_console_handle_socket(socket: WebSocket, wsnum: usize) {
     println!("{PREFIX_ALGS} New algs websocket connection #{}!", wsnum);
     let (mut sender, mut receiver) = socket.split();
     tokio::spawn(async move {
         let mut i = 0;
         loop {
-            let payload = format!("alg console test {i}\n");
+            let payload = format!("[{}] alg console test {i}\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
 
             if sender.send(Message::Text(payload)).await.is_err() {
                 println!("{PREFIX_ALGS} WS #{wsnum}: Sender closed!");
@@ -249,7 +282,7 @@ async fn algorithms_handle_socket(socket: WebSocket, wsnum: usize) {
             }
 
             i += 1;
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
         }
     });
     tokio::spawn( async move {    
