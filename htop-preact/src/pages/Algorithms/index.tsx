@@ -20,7 +20,7 @@ export function Algorithms() {
                     headers: { 
                         "Content-Type": "application/json",
                     },
-                    body: JSON.stringify({ request_type: "list", list_type: "graph"})
+                    body: JSON.stringify({ request_type: "list", content: {list_type: "graph"}})
                 });
                 let response = await test.json();
                 console.log("Response: " + response);
