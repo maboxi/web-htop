@@ -1,15 +1,19 @@
 import { render } from "preact";
 import { useEffect, useRef } from "preact/hooks";
+import { signal } from "@preact/signals";
+import './style.css';
 
-const API = 'http://127.0.0.1:7032/api/algorithms';
+const API = '127.0.0.1:7032/api/algorithms';
+const signal_scrollbox = signal(0);
 
 export function Algorithms() {
-    let ref = useRef(null);
-
+    let ref_testtext = useRef(null);
+    let ref_scrollbox = useRef(null);
+    
     useEffect(() => {
         setInterval(async () => {
-            if (!(ref.current == null)) {
-                let test = await fetch(API, {
+            if (!(ref_testtext.current == null)) {
+                let test = await fetch('http://' + API, {
                     method: "POST",
                     headers: { 
                         "Content-Type": "application/json",
@@ -18,13 +22,39 @@ export function Algorithms() {
                 });
                 let response = await test.json();
                 console.log("Response: " + response);
-                render(<>{"Response: " + response}</>, ref.current);
-
+                render(<>{"Response: " + response}</>, ref_testtext.current);
             }
         }, 5000);
     });
 
+    useEffect(() => {
+        console.log("[ALGS] Connecting WebSocket to " + API + "/ws");
+        const socket = new WebSocket('ws://' + API + '/ws/console');
+        socket.addEventListener('message', (event) => {
+            if(!(ref_testtext.current == null)) {
+                signal_scrollbox.value = signal_scrollbox.value + event.data;
+                render(<>{signal_scrollbox.value}</>, ref_scrollbox.current);
+                ref_scrollbox.current.scrollTop = ref_testtext.current.scrollHeight;
+            } else {
+                console.log("[ALGS] Closing websocket...");
+                socket.close();
+            }
+        });
+
+
+        window.addEventListener("unload", function () {
+        if(socket.readyState == WebSocket.OPEN) {
+            console.log("Closing websocket from window unload event...");
+            socket.close();
+        }
+        });
+    });
+
     return (
-        <p ref={ref}>Algorithms</p>
+        <div id="algorithms-outer">
+            <h1>Algorithms</h1>
+            <p id="algorithms-testoutput" ref={ref_testtext} />
+            <div class="scrollbar" ref={ref_scrollbox} style="height:500px;width:500px;overflow:auto;white-space: pre-line;" />
+        </div>
     );
 }
