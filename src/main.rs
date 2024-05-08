@@ -1,14 +1,22 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{extract::{ws::{Message, WebSocket}, State, WebSocketUpgrade}, http::{header::CONTENT_TYPE, Method}, response::{IntoResponse, Response}, routing::{get, post}, Json, Router};
+use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use sysinfo::System;
 use tower_http::cors::{Any, CorsLayer};
 
+const PREFIX_HTOP: &str = "[HTOP]";
+const PREFIX_ALGS: &str = "[ALGS]";
 
 #[tokio::main]
 async fn main() {
-    let shared_state = Arc::new(AppState {system_state: Arc::new(Mutex::new(SystemState::default())), reqcounter: Mutex::new(0)});
+    let shared_state = Arc::new(AppState {
+        system_state: Arc::new(Mutex::new(SystemState::default())),
+        reqcounter: Mutex::new(0),
+        wscounter_cpus: Mutex::new(0),
+        wscounter_algs: Mutex::new(0),
+    });
 
     let app = Router::new()
         .route("/api/cpus", get(cpus_get))
@@ -66,7 +74,9 @@ struct SystemState {
 
 struct AppState {
     system_state: Arc<Mutex<SystemState>>,
-    reqcounter: Mutex<usize>
+    reqcounter: Mutex<usize>,
+    wscounter_cpus: Mutex<usize>,
+    wscounter_algs: Mutex<usize>,
 }
 
 
@@ -76,17 +86,56 @@ async fn cpus_get(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 }
 
 async fn cpus_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
-    socket.on_upgrade(|ws| async { cpus_handle_socket(ws, state).await })
-}
-
-async fn cpus_handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
-    loop {
-        let payload = serde_json::to_string(&(*state.system_state.lock().unwrap())).unwrap_or("{'error': 'system state json conversion failed!'}".to_string());
-        socket.send(Message::Text(payload)).await.unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    let counter: usize;
+    {
+        let mut state_counter = state.wscounter_cpus.lock().unwrap();
+        *state_counter += 1;
+        counter = *state_counter;
     }
+
+    socket.on_upgrade(move |ws| async move { cpus_handle_socket(ws, state, counter).await })
 }
 
+async fn cpus_handle_socket(socket: WebSocket, state: Arc<AppState>, wsnum: usize) {
+    println!("{PREFIX_HTOP} New cpus websocket connection #{}!", wsnum);
+    let (mut sender, mut receiver) = socket.split();
+    tokio::spawn(async move {
+        loop {
+            let payload = serde_json::to_string(&(*state.system_state.lock().unwrap())).unwrap_or("{'error': 'system state json conversion failed!'}".to_string());
+
+            if sender.send(Message::Text(payload)).await.is_err() {
+                println!("{PREFIX_HTOP} WS #{wsnum}: Sender closed!");
+                return;
+           }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    });
+    tokio::spawn( async move {    
+        loop {
+            let msg = receiver.next().await;
+            match msg {
+                Some(Ok(msg)) => {
+                    match msg {
+                        Message::Close(None) => {
+                            println!("{PREFIX_HTOP} WS #{wsnum}: Received CLOSE message!");
+                            return;
+                        },
+                        msg => {
+                            println!("{PREFIX_HTOP} WS #{wsnum}: Received message: {:?}", msg);
+                        }
+                    }
+                },
+               Some(Err(e)) => {
+                    println!("{PREFIX_HTOP} WS #{wsnum}: Error receiving message: {:?}", e);
+                },
+                None => {
+                    println!("{PREFIX_HTOP} WS #{wsnum}: Receiver closed!");
+                    return;
+                }
+            }
+        }
+    });
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct AlgorithmRequest {
@@ -175,13 +224,57 @@ async fn algorithms_post(State(state): State<Arc<AppState>>, request_body: Strin
     response
 }
 
-async fn algorithms_ws_handler(socket: WebSocketUpgrade) -> impl IntoResponse {
-    socket.on_upgrade(|ws| algorithms_handle_socket(ws))
+async fn algorithms_ws_handler(socket: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let counter: usize;
+    {
+        let mut state_counter = state.wscounter_algs.lock().unwrap();
+        *state_counter += 1;
+        counter = *state_counter;
+    }
+
+    socket.on_upgrade(move |ws| async move { algorithms_handle_socket(ws, counter).await })
 }
 
-async fn algorithms_handle_socket(mut socket: WebSocket) {
-    if socket.send(Message::Text("Hello from the server!".to_string())).await.is_err() {
-        println!("Socket closed!");
-        return;
-    }
+async fn algorithms_handle_socket(socket: WebSocket, wsnum: usize) {
+    println!("{PREFIX_ALGS} New algs websocket connection #{}!", wsnum);
+    let (mut sender, mut receiver) = socket.split();
+    tokio::spawn(async move {
+        let mut i = 0;
+        loop {
+            let payload = format!("alg console test {i}\n");
+
+            if sender.send(Message::Text(payload)).await.is_err() {
+                println!("{PREFIX_ALGS} WS #{wsnum}: Sender closed!");
+                return;
+            }
+
+            i += 1;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    });
+    tokio::spawn( async move {    
+        loop {
+            let msg = receiver.next().await;
+            match msg {
+                Some(Ok(msg)) => {
+                    match msg {
+                        Message::Close(None) => {
+                            println!("{PREFIX_ALGS} WS #{wsnum}: Received CLOSE message!");
+                            return;
+                        },
+                        msg => {
+                            println!("{PREFIX_ALGS} WS #{wsnum}: Received message: {:?}", msg);
+                        }
+                    }
+                },
+               Some(Err(e)) => {
+                    println!("{PREFIX_ALGS} WS #{wsnum}: Error receiving message: {:?}", e);
+                },
+                None => {
+                    println!("{PREFIX_ALGS} WS #{wsnum}: Receiver closed!");
+                    return;
+                }
+            }
+        }
+    });
 }
