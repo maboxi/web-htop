@@ -175,7 +175,7 @@ async fn algorithms_console_handle_socket(socket: WebSocket, wsnum: usize) {
             }
 
             i += 1;
-            tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         }
     });
     tokio::spawn( async move {    

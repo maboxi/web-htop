@@ -1,6 +1,8 @@
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
+use crate::PREFIX_ALGS;
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Algorithm {
@@ -133,7 +135,7 @@ pub async fn handle_algorithm_request(request_body: String) -> Json<(AlgorithmEx
         },
         Err(e) => {
             let errmsg = format!("Error parsing toplevel request: {:?}", e);
-            println!("{}", errmsg);
+            println!("{PREFIX_ALGS} {}", errmsg);
             return Json((AlgorithmExecutionResponse::Error, errmsg));
         }
     };
@@ -146,7 +148,7 @@ pub async fn handle_algorithm_request(request_body: String) -> Json<(AlgorithmEx
                 },
                 Err(e) => {
                     let errmsg = format!("Error parsing list request: {:?}", e);
-                    println!("{}", errmsg);
+                    println!("{PREFIX_ALGS} {}", errmsg);
                     return Json((AlgorithmExecutionResponse::Error, errmsg));
                 }
             };
@@ -158,7 +160,7 @@ pub async fn handle_algorithm_request(request_body: String) -> Json<(AlgorithmEx
                 },
                 Err(e) => {
                     let errmsg = format!("Error parsing execution request: {:?}", e);
-                    println!("{}", errmsg);
+                    println!("{PREFIX_ALGS} {}", errmsg);
                     return Json((AlgorithmExecutionResponse::Error, errmsg));
                 }
             };
@@ -173,7 +175,7 @@ fn handle_list_request(request: AlgorithmListRequest) -> Json<(AlgorithmExecutio
                 &Algorithm::values().iter()
                 .map(|alg| alg.name()).collect::<Vec<_>>())
                 .unwrap_or_else(|err| {
-                    println!("Graph algorithm list jsonification failed: {:?}", err);
+                    println!("{PREFIX_ALGS} Graph algorithm list jsonification failed: {:?}", err);
                     "'error': 'algorithm list json conversion failed!']".to_string()
                 });
             Json((AlgorithmExecutionResponse::Ok, algs))

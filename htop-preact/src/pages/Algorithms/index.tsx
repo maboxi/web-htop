@@ -53,7 +53,7 @@ export function Algorithms() {
         <div id="algorithms-outer">
             <h1>Algorithms</h1>
             <p id="algorithms-testoutput" ref={ref_testtext} />
-            <div class="scrollbox" ref={ref_scrollbox} style="">{signal_scrollbox.value}</div>
+            <div class="scrollbox" ref={ref_scrollbox} style=""><p>{signal_scrollbox.value}</p></div>
         </div>
     );
 }
