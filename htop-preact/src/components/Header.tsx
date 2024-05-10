@@ -15,9 +15,6 @@ export function Header() {
 				<a href="/htop" class={url == '/htop' && 'active'}>
 					Web-HTOP
 				</a>
-				<a href="/404" class={url == '/404' && 'active'}>
-					404
-				</a>
 			</nav>
 		</header>
 	);
