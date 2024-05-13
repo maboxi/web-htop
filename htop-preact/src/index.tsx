@@ -6,6 +6,7 @@ import { HTOP } from './pages/HTOP/index.jsx';
 import { Algorithms } from './pages/Algorithms/index.js';
 import { NotFound } from './pages/_404.jsx';
 import './style.css';
+import { Component } from 'preact';
 
 export function App() {
 	return (
